@@ -13,6 +13,7 @@ import type {
 	PlannedElementMove,
 	PlannedTrackCreation,
 } from "@/timeline/group-move";
+import { normalizeTimelineElement } from "@/timeline/normalize";
 import { findTrackInSceneTracks } from "@/timeline/track-element-update";
 
 export class MoveElementCommand extends Command {
@@ -81,8 +82,12 @@ export class MoveElementCommand extends Command {
 			}
 
 			movedElementsById.set(move.elementId, {
-				...sourceElement,
-				startTime: move.newStartTime,
+				...normalizeTimelineElement({
+					element: {
+						...sourceElement,
+						startTime: move.newStartTime,
+					},
+				}),
 			});
 		}
 

@@ -6,6 +6,10 @@ import {
 } from "@/retime";
 import type { RetimeConfig, SceneTracks, TimelineElement } from "@/timeline";
 import { isRetimableElement } from "@/timeline";
+import {
+	normalizeTimelineElement,
+	normalizeTimelineValue,
+} from "@/timeline/normalize";
 
 type ElementUpdateField = keyof TimelineElement | string;
 
@@ -70,7 +74,7 @@ const deriveRules: ElementUpdateRule[] = [
 				element: {
 					...element,
 					retime: nextRetime,
-					duration: nextDuration,
+					duration: normalizeTimelineValue({ value: nextDuration }),
 				},
 				changedFields: ["retime", "duration"],
 			};
@@ -82,25 +86,31 @@ const enforceRules: ElementUpdateRule[] = [
 	{
 		triggers: ["duration"],
 		apply: ({ element }) => ({
-			element: {
-				...element,
-				animations: clampAnimationsToDuration({
-					animations: element.animations,
-					duration: element.duration,
-				}),
-			},
+			element: normalizeTimelineElement({
+				element: {
+					...element,
+					animations: clampAnimationsToDuration({
+						animations: element.animations,
+						duration: element.duration,
+					}),
+				},
+			}),
 		}),
 	},
 	{
 		triggers: ["startTime"],
 		apply: ({ element, context }) => {
-			const requestedStartTime = Math.max(0, element.startTime);
+			const requestedStartTime = normalizeTimelineValue({
+				value: Math.max(0, element.startTime),
+			});
 			if (context.trackId !== context.tracks.main.id) {
 				return {
-					element: {
-						...element,
-						startTime: requestedStartTime,
-					},
+					element: normalizeTimelineElement({
+						element: {
+							...element,
+							startTime: requestedStartTime,
+						},
+					}),
 				};
 			}
 
@@ -114,13 +124,16 @@ const enforceRules: ElementUpdateRule[] = [
 				}, null);
 
 			return {
-				element: {
-					...element,
-					startTime:
-						!earliestElement || requestedStartTime <= earliestElement.startTime
-							? 0
-							: requestedStartTime,
-				},
+				element: normalizeTimelineElement({
+					element: {
+						...element,
+						startTime:
+							!earliestElement ||
+							requestedStartTime <= earliestElement.startTime
+								? 0
+								: requestedStartTime,
+					},
+				}),
 			};
 		},
 	},
@@ -136,9 +149,7 @@ export function applyElementUpdate({
 	context: ElementUpdateContext;
 }): TimelineElement {
 	let nextElement = { ...element, ...patch } as TimelineElement;
-	const changedFields = new Set(
-		Object.keys(patch) as ElementUpdateField[],
-	);
+	const changedFields = new Set(Object.keys(patch) as ElementUpdateField[]);
 
 	for (const rule of deriveRules) {
 		if (!shouldApplyRule({ rule, changedFields })) {
@@ -170,7 +181,7 @@ export function applyElementUpdate({
 		}).element;
 	}
 
-	return nextElement;
+	return normalizeTimelineElement({ element: nextElement });
 }
 
 function shouldApplyRule({

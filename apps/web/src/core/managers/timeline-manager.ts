@@ -9,6 +9,8 @@ import type {
 	RetimeConfig,
 } from "@/timeline";
 import { calculateTotalDuration } from "@/timeline";
+import { normalizeSceneTracks } from "@/timeline/normalize";
+import { quantizeMediaTime } from "@/wasm/ticks";
 import { findTrackInSceneTracks } from "@/timeline/track-element-update";
 import {
 	canElementBeHidden,
@@ -210,7 +212,7 @@ export class TimelineManager {
 	}
 
 	getLastFrameTime(): number {
-		const duration = this.getTotalDuration();
+		const duration = quantizeMediaTime({ time: this.getTotalDuration() });
 		const fps = this.editor.project.getActive()?.settings.fps;
 		if (!fps || duration <= 0) return duration;
 		return lastFrameTime({ duration, rate: fps }) ?? duration;
@@ -926,7 +928,9 @@ export class TimelineManager {
 	updateTracks(newTracks: SceneTracks): void {
 		this.previewOverlay.clear();
 		this.previewTracks = null;
-		this.editor.scenes.updateSceneTracks({ tracks: newTracks });
+		this.editor.scenes.updateSceneTracks({
+			tracks: normalizeSceneTracks({ tracks: newTracks }),
+		});
 		this.notify();
 	}
 }

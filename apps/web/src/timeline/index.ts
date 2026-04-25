@@ -1,4 +1,5 @@
 import type { SceneTracks } from "./types";
+import { normalizeTimelineValue } from "./normalize";
 
 export * from "./types";
 export * from "./drag";
@@ -25,5 +26,5 @@ export function calculateTotalDuration({
 		}, 0),
 	);
 
-	return Math.max(...trackEndTimes, 0);
+	return normalizeTimelineValue({ value: Math.max(...trackEndTimes, 0) });
 }

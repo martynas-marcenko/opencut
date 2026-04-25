@@ -1,4 +1,10 @@
 import type { TProject, TProjectMetadata } from "@/project/types";
+import {
+	normalizeBookmark,
+	normalizeScene,
+	normalizeSceneTracks,
+	normalizeTimelineValue,
+} from "@/timeline/normalize";
 import { getProjectDurationFromScenes } from "@/timeline/scenes";
 import type { MediaAsset } from "@/media/types";
 import { IndexedDBAdapter } from "./indexeddb-adapter";
@@ -127,25 +133,30 @@ class StorageService {
 	}
 
 	async saveProject({ project }: { project: TProject }): Promise<void> {
+		const normalizedScenes = project.scenes.map((scene) =>
+			normalizeScene({ scene }),
+		);
 		const duration =
 			project.metadata.duration ??
-			getProjectDurationFromScenes({ scenes: project.scenes });
-		const serializedScenes: SerializedScene[] = project.scenes.map((scene) => ({
-			id: scene.id,
-			name: scene.name,
-			isMain: scene.isMain,
-			tracks: this.stripAudioBuffers({ tracks: scene.tracks }),
-			bookmarks: scene.bookmarks,
-			createdAt: scene.createdAt.toISOString(),
-			updatedAt: scene.updatedAt.toISOString(),
-		}));
+			getProjectDurationFromScenes({ scenes: normalizedScenes });
+		const serializedScenes: SerializedScene[] = normalizedScenes.map(
+			(scene) => ({
+				id: scene.id,
+				name: scene.name,
+				isMain: scene.isMain,
+				tracks: this.stripAudioBuffers({ tracks: scene.tracks }),
+				bookmarks: scene.bookmarks,
+				createdAt: scene.createdAt.toISOString(),
+				updatedAt: scene.updatedAt.toISOString(),
+			}),
+		);
 
 		const serializedProject: SerializedProject = {
 			metadata: {
 				id: project.metadata.id,
 				name: project.metadata.name,
 				thumbnail: project.metadata.thumbnail,
-				duration,
+				duration: normalizeTimelineValue({ value: duration }),
 				createdAt: project.metadata.createdAt.toISOString(),
 				updatedAt: project.metadata.updatedAt.toISOString(),
 			},
@@ -153,7 +164,14 @@ class StorageService {
 			currentSceneId: project.currentSceneId,
 			settings: project.settings,
 			version: project.version,
-			timelineViewState: project.timelineViewState,
+			timelineViewState: project.timelineViewState
+				? {
+						...project.timelineViewState,
+						playheadTime: normalizeTimelineValue({
+							value: project.timelineViewState.playheadTime,
+						}),
+					}
+				: undefined,
 		};
 
 		await this.projectsAdapter.set(project.metadata.id, serializedProject);
@@ -187,8 +205,10 @@ class StorageService {
 				id: scene.id,
 				name: scene.name,
 				isMain: scene.isMain,
-				tracks: scene.tracks,
-				bookmarks: normalizeBookmarks({ raw: scene.bookmarks }),
+				tracks: normalizeSceneTracks({ tracks: scene.tracks }),
+				bookmarks: normalizeBookmarks({ raw: scene.bookmarks }).map(
+					(bookmark) => normalizeBookmark({ bookmark }),
+				),
 				createdAt: new Date(scene.createdAt),
 				updatedAt: new Date(scene.updatedAt),
 			})) ?? [];
@@ -198,9 +218,11 @@ class StorageService {
 				id: serializedProject.metadata.id,
 				name: serializedProject.metadata.name,
 				thumbnail: serializedProject.metadata.thumbnail,
-				duration:
-					serializedProject.metadata.duration ??
-					getProjectDurationFromScenes({ scenes }),
+				duration: normalizeTimelineValue({
+					value:
+						serializedProject.metadata.duration ??
+						getProjectDurationFromScenes({ scenes }),
+				}),
 				createdAt: new Date(serializedProject.metadata.createdAt),
 				updatedAt: new Date(serializedProject.metadata.updatedAt),
 			},
@@ -208,7 +230,14 @@ class StorageService {
 			currentSceneId: serializedProject.currentSceneId || "",
 			settings: serializedProject.settings,
 			version: serializedProject.version,
-			timelineViewState: serializedProject.timelineViewState,
+			timelineViewState: serializedProject.timelineViewState
+				? {
+						...serializedProject.timelineViewState,
+						playheadTime: normalizeTimelineValue({
+							value: serializedProject.timelineViewState.playheadTime,
+						}),
+					}
+				: undefined,
 		};
 
 		return { project };

@@ -9,6 +9,10 @@ import { EditorCore } from "@/core";
 import { isRetimableElement } from "@/timeline";
 import { splitAnimationsAtTime } from "@/animation";
 import { getSourceSpanAtClipTime } from "@/retime";
+import {
+	normalizeTimelineElement,
+	normalizeTimelineValue,
+} from "@/timeline/normalize";
 
 export class SplitElementsCommand extends Command {
 	private savedState: SceneTracks | null = null;
@@ -73,9 +77,13 @@ export class SplitElementsCommand extends Command {
 					return [element];
 				}
 
-				const relativeTime = this.splitTime - element.startTime;
+				const relativeTime = normalizeTimelineValue({
+					value: this.splitTime - element.startTime,
+				});
 				const leftVisibleDuration = relativeTime;
-				const rightVisibleDuration = element.duration - relativeTime;
+				const rightVisibleDuration = normalizeTimelineValue({
+					value: element.duration - relativeTime,
+				});
 				const retimeRef = isRetimableElement(element)
 					? element.retime
 					: undefined;
@@ -97,14 +105,16 @@ export class SplitElementsCommand extends Command {
 
 				if (this.retainSide === "left") {
 					splitResult = [
-						{
-							...element,
-							duration: leftVisibleDuration,
-							trimEnd: element.trimEnd + rightSourceSpan,
-							name: `${element.name} (left)`,
-							animations: leftAnimations,
-							...(retimeRef !== undefined ? { retime: retimeRef } : {}),
-						},
+						normalizeTimelineElement({
+							element: {
+								...element,
+								duration: leftVisibleDuration,
+								trimEnd: element.trimEnd + rightSourceSpan,
+								name: `${element.name} (left)`,
+								animations: leftAnimations,
+								...(retimeRef !== undefined ? { retime: retimeRef } : {}),
+							},
+						}),
 					];
 				} else if (this.retainSide === "right") {
 					const newId = generateUUID();
@@ -113,16 +123,18 @@ export class SplitElementsCommand extends Command {
 						elementId: newId,
 					});
 					splitResult = [
-						{
-							...element,
-							id: newId,
-							startTime: this.splitTime,
-							duration: rightVisibleDuration,
-							trimStart: element.trimStart + leftSourceSpan,
-							name: `${element.name} (right)`,
-							animations: rightAnimations,
-							...(retimeRef !== undefined ? { retime: retimeRef } : {}),
-						},
+						normalizeTimelineElement({
+							element: {
+								...element,
+								id: newId,
+								startTime: this.splitTime,
+								duration: rightVisibleDuration,
+								trimStart: element.trimStart + leftSourceSpan,
+								name: `${element.name} (right)`,
+								animations: rightAnimations,
+								...(retimeRef !== undefined ? { retime: retimeRef } : {}),
+							},
+						}),
 					];
 				} else {
 					// "both" - split into two pieces
@@ -132,24 +144,28 @@ export class SplitElementsCommand extends Command {
 						elementId: secondElementId,
 					});
 					splitResult = [
-						{
-							...element,
-							duration: leftVisibleDuration,
-							trimEnd: element.trimEnd + rightSourceSpan,
-							name: `${element.name} (left)`,
-							animations: leftAnimations,
-							...(retimeRef !== undefined ? { retime: retimeRef } : {}),
-						},
-						{
-							...element,
-							id: secondElementId,
-							startTime: this.splitTime,
-							duration: rightVisibleDuration,
-							trimStart: element.trimStart + leftSourceSpan,
-							name: `${element.name} (right)`,
-							animations: rightAnimations,
-							...(retimeRef !== undefined ? { retime: retimeRef } : {}),
-						},
+						normalizeTimelineElement({
+							element: {
+								...element,
+								duration: leftVisibleDuration,
+								trimEnd: element.trimEnd + rightSourceSpan,
+								name: `${element.name} (left)`,
+								animations: leftAnimations,
+								...(retimeRef !== undefined ? { retime: retimeRef } : {}),
+							},
+						}),
+						normalizeTimelineElement({
+							element: {
+								...element,
+								id: secondElementId,
+								startTime: this.splitTime,
+								duration: rightVisibleDuration,
+								trimStart: element.trimStart + leftSourceSpan,
+								name: `${element.name} (right)`,
+								animations: rightAnimations,
+								...(retimeRef !== undefined ? { retime: retimeRef } : {}),
+							},
+						}),
 					];
 				}
 
